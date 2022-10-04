@@ -1,0 +1,94 @@
+from gym import Env
+from gym.spaces import Discrete, Box
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+
+alpha = 0.1
+gamma = 0.999
+epsilon = 0.6
+delta = epsilon/500
+
+q = {}
+for s in range(100):
+    for c in range(101):
+        for a in range(2):
+            q[(s,c,a)] = 0
+
+r = 100
+cr = 120
+cm = 30
+
+class level2(Env):
+    def __init__(self):
+        self.action_space = Discrete(2) #0 for no maintenance and 1 for maintenance
+        self.state = 0
+        self.condition = 1
+        self.fail = 0.02
+    
+    def step(self,action):
+        info = {}
+        done = False
+        if action == 0:
+            if random.uniform(0,1) < self.fail:
+                self.state = 0
+                self.condition = 1
+                self.fail = 0.02
+                return(r-cr, self.state, self.condition , done ,info)
+            else:
+                self.state += 1
+                self.condition = self.condition - 0.1 * (random.uniform(0,1))
+                self.fail = max(0.02 + 0.05 * self.state, 1 - self.condition)
+                return(r, self.state, self.condition , done ,info)
+                
+        if action == 1:
+            self.state = 0
+            self.condition = 1
+            self.fail = 0.02
+            return(r-cm, self.state, self.condition , done ,info)
+        
+    def update_qtable(self,action,prevstate, prevcondition,reward,gamma):
+        newcondition = int(100 * (self.condition))
+        qa = max([q[(self.state, newcondition, a)] for a in range(env.action_space.n)])
+        q[(prevstate, prevcondition, action)] += alpha * (reward + gamma * qa - q[(prevstate, prevcondition, action)])
+    
+    def epsilon_greedy_policy(self, prevstate, prevcondition, epsilon):
+        if random.uniform(0,1) < epsilon:
+            return env.action_space.sample()
+        else:
+            return max(list(range(env.action_space.n)), key = lambda x: q[(prevstate, prevcondition, x)])
+
+    
+            
+    def reset(self):
+        self.state = 0
+        self.condition = 1
+        self.fail = 0.02
+        return self.state
+env = level2()
+epochs = 1000
+prevstate = 0
+prevcondition = 100
+done = False
+score = 0
+reward_arr = []
+avg_arr = []
+epoch_arr = []
+for epoch in range(1,epochs+1):
+    action = env.epsilon_greedy_policy(prevstate, prevcondition, epsilon)        
+    reward, newstate, newcondition, done, info = env.step(action)
+    newcondition = int(100 * (newcondition))
+    env.update_qtable(action,prevstate,prevcondition,reward,gamma)
+    epsilon -= delta/epsilon
+    prevstate = newstate
+    prevcondition = newcondition
+    score += reward
+    avg = score/epoch
+    reward_arr.append(reward)
+    avg_arr.append(np.sum(reward_arr) / (epoch + 1))
+    epoch_arr.append(epoch)
+    print('Epoch:{} Score:{} Avg:{}'.format(epoch, score, avg))
+plt.plot(epoch_arr, avg_arr)
+plt.xlabel('x - axis')
+plt.ylabel('y - axis')
+plt.show()

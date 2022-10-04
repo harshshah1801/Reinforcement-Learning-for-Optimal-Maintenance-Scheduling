@@ -1,0 +1,89 @@
+from gym import Env
+from gym.spaces import Discrete, Box
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+
+alpha = 0.01
+gamma = 0.999
+epsilon = 0.59
+delta = epsilon/500
+
+q = {}
+for s in range(100):
+        for a in range(2):
+            q[(s,a)] = 0
+
+r = 100
+cr = 120
+cm = 30
+
+class level3(Env):
+    def __init__(self):
+        self.action_space = Discrete(2) #0 for no maintenance and 1 for maintenance
+        self.state = 0
+        self.fail = 0
+        
+    def step(self,action):
+        info = {}
+        done = False
+        if action == 0:
+            if random.uniform(0,1) < self.fail:
+                reward = 100 - 5 * self.state
+                self.state = 0
+                self.fail = 0
+                return(reward-cr, self.state, done ,info)
+            else:
+                reward = 100 - 5 * self.state
+                self.state += 1
+                self.fail = 0.05 * self.state
+                return(r, self.state, done ,info)
+                
+        if action == 1:
+            reward = 100
+            self.state = 0
+            self.fail = 0
+            return(reward-cm, self.state, done ,info)
+        
+    def update_qtable(self,action,prevstate,reward,gamma):
+        qa = max([q[(self.state, a)] for a in range(env.action_space.n)])
+        q[(prevstate, action)] += alpha * (reward + gamma * qa - q[(prevstate, action)])
+    
+    def epsilon_greedy_policy(self, prevstate, epsilon):
+        if random.uniform(0,1) < epsilon:
+            return env.action_space.sample()
+        else:
+            return max(list(range(env.action_space.n)), key = lambda x: q[(prevstate, x)])
+
+    
+            
+    def reset(self):
+        self.state = 0
+        self.fail = 0
+        return self.state
+
+env = level3()
+
+epochs = 1000
+prevstate = 0
+done = False
+score = 0
+reward_arr = []
+avg_arr = []
+epoch_arr = []
+for epoch in range(1,epochs+1):
+    action = env.epsilon_greedy_policy(prevstate, epsilon)        
+    reward, newstate, done, info = env.step(action)
+    env.update_qtable(action,prevstate,reward,gamma)
+    epsilon -= delta/epsilon
+    prevstate = newstate
+    score += reward
+    avg = score/epoch
+    reward_arr.append(reward)
+    avg_arr.append(np.sum(reward_arr) / (epoch + 1))
+    epoch_arr.append(epoch)
+print('Epoch:{} Score:{} Avg:{}'.format(epoch, score, avg))
+plt.plot(epoch_arr, avg_arr)
+plt.xlabel('x - axis')
+plt.ylabel('y - axis')
+plt.show()
